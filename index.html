@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auckland Companies Map</title>
+  <meta name="description" content="Explore Auckland companies for chemistry, science and biotechnology job seekers.">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
+  <style>
+    :root {
+      --navy: #142b40;
+      --teal: #19a7a1;
+      --text: #243746;
+      --muted: #667887;
+      --page-bg: #f3f6f8;
+      --border: #dce5eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: var(--page-bg);
+    }
+
+    .site-header {
+      position: relative;
+      z-index: 500;
+      padding: 11px 16px 12px;
+      text-align: center;
+      color: #fff;
+      background: var(--navy);
+      border-bottom: 3px solid var(--teal);
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: #9cc7d7;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .site-title {
+      margin: 0;
+      color: #fff;
+      font-family: "Arial Black", Arial, Helvetica, sans-serif;
+      font-size: clamp(21px, 2.5vw, 29px);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+    }
+
+    .site-subtitle {
+      margin: 5px 0 0;
+      color: #e0eaf0;
+      font-size: clamp(11px, 1.3vw, 13px);
+      line-height: 1.4;
+    }
+
+    .site-author {
+      margin: 4px 0 0;
+      color: #a9c1d0;
+      font-size: 11px;
+    }
+
+    .map-section {
+      position: relative;
+      height: calc(100vh - 125px);
+      min-height: 430px;
+      background: #e5edf1;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .data-status {
+      position: absolute;
+      z-index: 450;
+      top: 12px;
+      left: 12px;
+      max-width: min(380px, calc(100% - 24px));
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 2px 10px rgba(20, 43, 64, 0.12);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .data-status.error {
+      color: #9d2525;
+      border-color: #e6b9b9;
+    }
+
+    .map-legend {
+      position: absolute;
+      z-index: 400;
+      right: 16px;
+      bottom: 20px;
+      width: 245px;
+      max-width: calc(100% - 24px);
+      padding: 14px 15px;
+      border: 1px solid rgba(20, 43, 64, 0.1);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 4px 18px rgba(20, 43, 64, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    .legend-title {
+      margin: 0 0 11px;
+      color: var(--navy);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 9px 0;
+      color: #394c5b;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .legend-dot {
+      flex: 0 0 11px;
+      width: 11px;
+      height: 11px;
+      margin-top: 2px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+
+    .legend-note {
+      margin: 11px 0 0;
+      padding-top: 9px;
+      border-top: 1px solid #e7edf1;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    /* Individual company markers */
+    .company-marker-wrap {
+      background: transparent !important;
+      border: none !important;
+    }
+
+    .company-marker {
+      display: block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38);
+      opacity: 1;
+    }
+
+    /* Cluster bubbles */
+    .company-cluster {
+      background: transparent !important;
+      border: none !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .company-cluster .cluster-count {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      border-radius: 50%;
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+      border: 3px solid #fff;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.30);
+    }
+
+    .company-cluster-small .cluster-count {
+      background: #2864d7;
+    }
+
+    .company-cluster-medium .cluster-count {
+      background: #087f8c;
+      font-size: 16px;
+    }
+
+    .company-cluster-large .cluster-count {
+      background: #1647a8;
+      font-size: 18px;
+    }
+
+    .company-popup {
+      min-width: 190px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .popup-name {
+      margin-bottom: 8px;
+      color: var(--navy);
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+
+    .popup-row {
+      margin-top: 5px;
+      color: #485b68;
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .popup-label {
+      color: #71818c;
+      font-weight: 700;
+    }
+
+    .map-footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px 24px;
+      padding: 15px 20px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+    }
+
+    .contact-button {
+      display: inline-block;
+      padding: 9px 16px;
+      border-radius: 6px;
+      color: #fff;
+      background: var(--teal);
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+
+    .contact-button:hover {
+      background: #128c87;
+    }
+
+    .source-link {
+      color: #435969;
+      font-size: 12px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .source-link:hover {
+      color: #087e79;
+    }
+
+    .sources-section {
+      padding: 18px 20px 22px;
+      text-align: center;
+      background: #fff;
+      border-top: 1px solid #edf1f4;
+    }
+
+    .footer-title {
+      margin: 0 0 7px;
+      color: var(--navy);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .footer-text {
+      max-width: 650px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .footer-text a {
+      color: #087e79;
+    }
+
+    .footer-credit {
+      margin: 12px 0 0;
+      color: #8a99a3;
+      font-size: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .site-header {
+        padding: 12px 10px 11px;
+      }
+
+      .site-title {
+        font-size: clamp(20px, 5.5vw, 26px);
+        letter-spacing: -0.4px;
+      }
+
+      .site-subtitle {
+        max-width: 370px;
+        margin: 5px auto 0;
+        font-size: 11px;
+      }
+
+      .map-section {
+        height: 78vh;
+        min-height: 430px;
+      }
+
+      .map-legend {
+        right: 9px;
+        bottom: 10px;
+        width: 220px;
+        padding: 11px;
+      }
+
+      .legend-title {
+        font-size: 12px;
+      }
+
+      .legend-item {
+        gap: 8px;
+        margin: 8px 0;
+        font-size: 10px;
+      }
+
+      .legend-note {
+        font-size: 10px;
+      }
+
+      .data-status {
+        top: 8px;
+        left: 8px;
+        font-size: 11px;
+      }
+
+      .map-footer {
+        gap: 12px 18px;
+        padding: 13px 12px;
+      }
+
+      .sources-section {
+        padding: 16px 14px 20px;
+      }
+
+      .company-marker {
+        width: 22px;
+        height: 22px;
+      }
+    }
+  </style>
+</head>
+
+
+<body>
+  <header class="site-header">
+    <p class="eyebrow">AUCKLAND · NEW ZEALAND</p>
+    <h1 class="site-title">Auckland Companies Map</h1>
+    <p class="site-subtitle">For Chemistry, Science, Biotechnology Job Seekers</p>
+    <p class="site-author">By Mac Huang</p>
+  </header>
+
+  <main>
+    <section class="map-section" aria-label="Auckland company map">
+      <div id="map"></div>
+
+      <div id="dataStatus" class="data-status" role="status" aria-live="polite">
+        Loading company data...
+      </div>
+
+      <aside class="map-legend">
+        <h2 class="legend-title">Company Categories</h2>
+
+        <div class="legend-item">
+          <span class="legend-dot" style="background:#4776d0"></span>
+          <span>Science &amp; Laboratory Testing</span>
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-dot" style="background:#19a7a1"></span>
+          <span>Food, Ingredient &amp; Chemical Production</span>
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-dot" style="background:#71818c"></span>
+          <span>Other / Unclassified</span>
+        </div>
+
+
+      </aside>
+    </section>
+
+    <section class="map-footer">
+        <a class="contact-button" href="mailto:abigmac1999@gmail.com?subject=Auckland%20Companies%20Map%20Enquiry">
+        Contact Us · abigmac1999@gmail.com
+        </a>
+
+
+        <a class="source-link" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Open Google
+          Maps</a>
+    </section>
+
+    <section class="sources-section">
+      <h2 class="footer-title">About This Map</h2>
+      <p class="footer-text">
+        Data sources: MBIE Companies Office Bulk Data (October 2026),
+        LinkedIn, and Google Maps. Mapping library: Leaflet.
+        This map is provided for informational purposes only
+        and is not intended for commercial use.
+      </p>
+      <p class="footer-credit">
+        Auckland Companies Map · Created for job seekers
+      </p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <script>
+    // MapTiler API key
+    const MAPTILER_KEY = 'Qj0BHv2XcwO40Km03q5s';
+
+    // Category colours
+    const categoryColors = {
+      'Science & Laboratory Testing': '#4776d0',
+      'Food & Ingredient & Chemical Production': '#19a7a1',
+      'Other / Unclassified': '#71818c'
+    };
+
+    const fallbackCategory = 'Other / Unclassified';
+
+    // Auckland map
+    const map = L.map('map', {
+      zoomControl: true,
+      preferCanvas: true
+    }).setView([-36.8485, 174.7633], 10);
+
+    // MapTiler basemap
+    L.tileLayer(
+      `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
+      {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+          '&copy; <a href="https://www.maptiler.com/">MapTiler</a>',
+        maxZoom: 20,
+        tileSize: 512,
+        zoomOffset: -1
+      }
+    ).addTo(map);
+
+    // Status message
+    function setStatus(message, isError = false) {
+      const status = document.getElementById('dataStatus');
+      status.textContent = message;
+      status.classList.toggle('error', isError);
+    }
+
+    // Safely display company names and addresses in popups
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, function (character) {
+        const replacements = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        };
+        return replacements[character];
+      });
+    }
+
+    // Create company cluster bubbles
+    const clusters = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: true,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius: 60,
+      disableClusteringAtZoom: 17,
+
+      iconCreateFunction: function (cluster) {
+        const count = cluster.getChildCount();
+
+        let size;
+        let diameter;
+
+        if (count >= 100) {
+          size = 'large';
+          diameter = 62;
+        } else if (count >= 10) {
+          size = 'medium';
+          diameter = 52;
+        } else {
+          size = 'small';
+          diameter = 44;
+        }
+
+        return L.divIcon({
+          html: `<span class="cluster-count">${count}</span>`,
+          className: `marker-cluster company-cluster company-cluster-${size}`,
+          iconSize: L.point(diameter, diameter),
+          iconAnchor: L.point(diameter / 2, diameter / 2)
+        });
+      }
+    });
+
+    map.addLayer(clusters);
+
+    // Create an individual company marker
+    function createCompanyMarker(company) {
+      const categoryName = String(company.category ?? '').trim();
+
+      const category = Object.prototype.hasOwnProperty.call(
+        categoryColors,
+        categoryName
+      ) ? categoryName : fallbackCategory;
+
+      const markerIcon = L.divIcon({
+        className: 'company-marker-wrap',
+        html:
+          `<span class="company-marker" ` +
+          `style="background:${categoryColors[category]}"></span>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -16]
+      });
+
+      const marker = L.marker(
+        [Number(company.lat), Number(company.lng)],
+        { icon: markerIcon }
+      );
+
+      const name = escapeHtml(company.name || 'Unnamed Company');
+      const address = String(company.address ?? '').trim();
+
+      const locationRow = address
+        ? `<div class="popup-row">
+             <span class="popup-label">Address: </span>
+             ${escapeHtml(address)}
+           </div>`
+        : '';
+
+      const popupContent = `
+        <div class="company-popup">
+          <div class="popup-name">${name}</div>
+          ${locationRow}
+          <div class="popup-row">
+            <span class="popup-label">Category: </span>
+            ${escapeHtml(category)}
+          </div>
+        </div>
+      `;
+
+      marker.bindPopup(popupContent);
+      return marker;
+    }
+
+    // Load company data from data/companies.json
+    async function loadCompanies() {
+      setStatus('Loading company data...');
+
+      try {
+        const response = await fetch('./data/companies.json', {
+          cache: 'no-store'
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Could not load data/companies.json (HTTP ${response.status}). ` +
+            'Check that the data folder and companies.json file exist.'
+          );
+        }
+
+        let companies;
+
+        try {
+          companies = await response.json();
+        } catch {
+          throw new Error(
+            'companies.json was found, but it is not valid JSON. ' +
+            'Please check the exported data file.'
+          );
+        }
+
+        if (!Array.isArray(companies)) {
+          throw new Error(
+            'The JSON data must be an array of company records.'
+          );
+        }
+
+        clusters.clearLayers();
+
+        const markers = [];
+        let skippedCount = 0;
+
+        companies.forEach(function (company) {
+          if (!company || typeof company !== 'object') {
+            skippedCount++;
+            return;
+          }
+
+          const lat = Number(company.lat);
+          const lng = Number(company.lng);
+
+          if (
+            company.lat === null ||
+            company.lat === undefined ||
+            company.lng === null ||
+            company.lng === undefined ||
+            company.lat === '' ||
+            company.lng === '' ||
+            !Number.isFinite(lat) ||
+            !Number.isFinite(lng) ||
+            lat < -90 ||
+            lat > 90 ||
+            lng < -180 ||
+            lng > 180 ||
+            !company.name
+          ) {
+            skippedCount++;
+            return;
+          }
+
+          const marker = createCompanyMarker(company);
+          markers.push(marker);
+        });
+
+        if (markers.length > 0) {
+          clusters.addLayers(markers);
+
+          const bounds = clusters.getBounds();
+
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, {
+              padding: [35, 35],
+              maxZoom: 13
+            });
+          }
+
+          let message = `Loaded ${markers.length} companies.`;
+
+          if (skippedCount > 0) {
+            message += ` Skipped ${skippedCount} records with missing or invalid data.`;
+          }
+
+          setStatus(message);
+        } else {
+          setStatus(
+            `The JSON file contains ${companies.length} records, ` +
+            'but no valid companies were loaded. Check whether the data ' +
+            'contains name, lat and lng fields.',
+            true
+          );
+        }
+
+        console.log('Company records in JSON:', companies.length);
+        console.log('Companies loaded:', markers.length);
+        console.log('Records skipped:', skippedCount);
+
+      } catch (error) {
+        console.error('Failed to load company data:', error);
+
+        setStatus(
+          `Failed to load company data: ${error.message}`,
+          true
+        );
+      }
+    }
+
+    // Start loading once the page scripts are ready
+    loadCompanies();
+
+  </script>
+</body>
+
+</html>
